@@ -1,12 +1,13 @@
     # -*- coding: utf-8 -*-
 
 """
-.. module:: write_cv.py.py
+.. module:: write_cv.py
    :license: GPL/CeCIL
    :platform: Unix, Windows
-   :synopsis: Maps raw WCRP CMIP6 vocab files to normalized pyessv format.
+   :synopsis: Maps raw GLAMOD GLAMOD vocab files to normalized pyessv format.
 
 .. moduleauthor:: Mark Conway-Greenslade <momipsl@ipsl.jussieu.fr>
+.. updateauthor:: Ag Stephens <ag.stephens@stfc.ac.uk>
 
 """
 import argparse
@@ -14,37 +15,36 @@ import json
 import os
 
 import arrow
-
+import datetime
 import pyessv
 
 
 
 # Define command line options.
-_ARGS = argparse.ArgumentParser("Maps raw WCRP CMIP6 vocab files to normalized pyessv CV format.")
+_ARGS = argparse.ArgumentParser("Maps raw GLAMOD vocab files to normalized pyessv CV format.")
 _ARGS.add_argument(
     "--source",
-    help="Path from which raw WCRP CMIP6 vocab files will be read.",
+    help="Path from which raw GLAMOD vocab files will be read.",
     dest="source",
     type=str
     )
 
-# Ensure we use fixed creation date.
-_CREATE_DATE = arrow.get("2017-03-21 00:00:00.000000+0000").datetime
+_CREATE_DATE = datetime.datetime.now()
 
-# CV authority = WCRP.
+# CV authority = GLAMOD.
 _AUTHORITY = pyessv.create_authority(
-    name="WCRP",
-    description="World Climate Research Program",
-    url="https://www.wcrp-climate.org/wgcm-overview",
+    name="GLAMOD-TEAM",
+    description="GLAMOD project",
+    url="http://glamod.website.no/treallink/",
     create_date=_CREATE_DATE
     )
 
-# CV scope = CMIP6.
-_SCOPE_CMIP6 = pyessv.create_scope(
+# CV scope = GLAMOD.
+_SCOPE_GLAMOD = pyessv.create_scope(
     authority=_AUTHORITY,
-    name="CMIP6",
-    description="Controlled Vocabularies (CVs) for use in CMIP6",
-    url="https://github.com/WCRP-CMIP/CMIP6_CVs",
+    name="GLAMOD",
+    description="Controlled Vocabularies (CVs) for use in GLAMOD",
+    url="https://github.com/glamod/GLAMOD_CVs",
     create_date=_CREATE_DATE
     )
 
@@ -53,28 +53,21 @@ _SCOPE_GLOBAL = pyessv.create_scope(
     authority=_AUTHORITY,
     name="GLOBAL",
     description="Global controlled Vocabularies (CVs)",
-    url="https://github.com/WCRP-CMIP/CMIP6_CVs",
+    url="https://github.com/glamod/GLAMOD_CVs",
     create_date=_CREATE_DATE
     )
 
-# Map of CMIP6 collections to data factories.
-_COLLECTIONS_CMIP6 = {
-    'activity_id': None,
-    'experiment_id': lambda obj, name: obj[name],
+# Map of GLAMOD collections to data factories.
+_COLLECTIONS_GLAMOD = {
     'frequency': None,
-    'grid_label': None,
     'institution_id': lambda obj, name: {'postal_address': obj[name]},
-    'nominal_resolution': None,
     'realm': None,
     'required_global_attributes': None,
-    'source_id': lambda obj, name: obj[name],
-    'source_type': None,
-    'table_id': None
+    'source_id': lambda obj, name: obj[name]
 }
 
 # Map of global collections to data factories.
 _COLLECTIONS_GLOBAL = {
-    'mip_era': None
 }
 
 def _main(args):
@@ -82,11 +75,11 @@ def _main(args):
 
     """
     if not os.path.isdir(args.source):
-        raise ValueError("WCRP vocab directory does not exist")
+        raise ValueError("GLAMOD vocab directory does not exist")
 
-    # Create CMIP6 collections.
-    for typeof, data_factory in _COLLECTIONS_CMIP6.items():
-        _create_collection_cmip6(args.source, typeof, data_factory)
+    # Create GLAMOD collections.
+    for typeof, data_factory in _COLLECTIONS_GLAMOD.items():
+        _create_collection_glamod(args.source, typeof, data_factory)
 
     # Create GLOBAL collections.
     for typeof, data_factory in _COLLECTIONS_GLOBAL.items():
@@ -99,67 +92,68 @@ def _main(args):
     pyessv.save()
 
 
-def _create_collection_cmip6(source, collection_type, data_factory):
-    """Creates cmip6 collection from a WCRP JSON files.
+def _create_collection_glamod(source, collection_type, data_factory):
+    """Creates GLAMOD collection from a GLAMOD JSON files.
 
     """
-    # Load WCRP json data.
-    wcrp_cv_data = _get_wcrp_cv(source, collection_type, "CMIP6_")
+    # Load GLAMOD json data.
+    glamod_cv_data = _get_glamod_cv(source, collection_type, "GLAMOD_")
 
     # Create collection.
     collection_name = collection_type.replace("_", "-")
     collection = pyessv.create_collection(
-        scope=_SCOPE_CMIP6,
+        scope=_SCOPE_GLAMOD,
         name=collection_name,
-        description="WCRP CMIP6 CV collection: ".format(collection_name),
+        description="GLAMOD CV collection: ".format(collection_name),
         create_date=_CREATE_DATE
         )
 
     # Create terms.
-    for name in wcrp_cv_data:
+    for name in glamod_cv_data:
         pyessv.create_term(
             collection=collection,
             name=name,
             description=name,
             create_date=_CREATE_DATE,
-            data=data_factory(wcrp_cv_data, name) if data_factory else None
+            data=data_factory(glamod_cv_data, name) if data_factory else None
             )
 
 
 def _create_collection_global(source, collection_type, data_factory):
-    """Creates global collection from a WCRP JSON files.
+    """Creates global collection from a GLAMOD JSON files.
 
     """
-    # Load WCRP json data.
-    wcrp_cv_data = _get_wcrp_cv(source, collection_type)
+    # Load GLAMOD json data.
+    glamod_cv_data = _get_glamod_cv(source, collection_type)
 
     # Create collection.
     collection_name = collection_type.replace("_", "-")
     collection = pyessv.create_collection(
         scope=_SCOPE_GLOBAL,
         name=collection_name,
-        description="WCRP GLOBAL CV collection: ".format(collection_name),
+        description="GLOBAL CV collection: ".format(collection_name),
         create_date=_CREATE_DATE
         )
 
     # Create terms.
-    for name in wcrp_cv_data:
+    for name in glamod_cv_data:
         pyessv.create_term(
             collection=collection,
             name=name,
             description=name,
             create_date=_CREATE_DATE,
-            data=data_factory(wcrp_cv_data, name) if data_factory else None
+            data=data_factory(glamod_cv_data, name) if data_factory else None
             )
 
 
-def _get_wcrp_cv(source, collection_type, prefix=""):
-    """Returns raw WCRP CV data.
+def _get_glamod_cv(source, collection_type, prefix=""):
+    """Returns raw GLAMOD CV data.
 
     """
     fname = "{}{}.json".format(prefix, collection_type)
     fpath = os.path.join(source, fname)
     with open(fpath, 'r') as fstream:
+        print fpath
         return json.loads(fstream.read())[collection_type]
 
 
